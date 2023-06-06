@@ -1,3 +1,18 @@
+"""
+pca
+
+This module implements a class to perform PCA on compositional data 
+using a CLR transformation and visualise the results on a biplot.
+
+Contents:
+- CompositionalPCA: Wrapper for sklearn PCA class that forces use of clr transform 
+for compositional data
+
+Citation: ``Principal Component Analysis of Compositional Data'' J. Aitchison 
+Biometrika Vol. 70, No. 1 (Apr., 1983), pp. 57-65 (9 pages) https://doi.org/10.2307/2335943
+
+"""
+
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -8,37 +23,65 @@ from compysitional.transforms import clr_df
 class CompositionalPCA:
     """Class to perform PCA on a compositional dataset
 
-    dataframe : Dataset of compositions (raw values e.g., %, ppm) with rows as compositions
-    and variables as columns.
-    categories : Series of categories which classify the compositions (e.g., lithology). Used to
-    colour PCA plots
-    values : Continuous values which might be used to classify the compositions (e.g., age)"""
+    Attributes:
+        comp_df : Dataframe of compositional data
+        categories : (Optional) Series of categories to classify compositional data (e.g., Lithology)
+        values : (Optional) Series of continuous values corresponding to compositional data (e.g., Age)
+        clr_df : CLR transform of `comp_df`
+        pca : PCA object of `clr_df`
+        loadings : Latent variables of dataset
+        scores : Scores of each composition on loadings
+
+    Methods:
+        fit() : Performs PCA on data setting most attributes
+        plot_variance_explained() : Plots variance explained.
+        plot_loadings() : Plots the loadings
+        plot_scores() : Plots the scores
+
+
+    Example usage:
+        >>> values = [[0.2, 0.3, 0.5],
+                    [0.4, 0.1, 0.5],
+                    [0.6, 0.2, 0.2],
+                    [0.3, 0.4, 0.3],
+                    [0.1, 0.5, 0.4]]
+        >>> comp_df = pd.DataFrame(values, columns=["Fe", "Mg", "Si"])
+        >>> comp_pca = WeathProv(comp_df, categories = pd.Series({"A","A","B","B","C}))
+        >>> comp_pca.fit()
+        >>> comp_pca.plot_loadings()
+        >>> comp_pca.plot_scores()
+
+    Args:
+        comp_df : DataFrame of compositional data.
+        categories : Series of categories which classify the compositions (e.g., lithology).
+        values : Continuous values which might be used to classify the compositions (e.g., age)
+    """
 
     def __init__(
         self,
-        dataframe: pd.DataFrame,
+        comp_df: pd.DataFrame,
         categories: pd.Series = None,
         values: pd.Series = None,
     ) -> None:
-        if dataframe.isna().any().any():
+        if comp_df.isna().any().any():
             raise Exception("Warning: dataframe contains NA values")
-        if dataframe.isnull().any().any():
+        if comp_df.isnull().any().any():
             raise Exception("Warning: dataframe contains Null values")
-        if (dataframe == 0).any().any():
+        if (comp_df == 0).any().any():
             raise Exception("Warning: dataframe contains zero values")
         if (categories is not None) and (values is not None):
             raise Exception("Warning cannot supply both values and categories")
 
-        self.comp_df = dataframe
-        self.categories = categories
-        self.values = values
-        self.clr_df = clr_df(dataframe)
-        self.pca = None
-        self.loadings = None
-        self.scores = None
+        self.comp_df: pd.DataFrame = comp_df
+        self.categories: pd.Series = categories
+        self.values: pd.Series = values
+        self.clr_df: pd.DataFrame = clr_df(comp_df)
+        self.pca: PCA = None
+        self.loadings: pd.DataFrame = None
+        self.scores: pd.DataFrame = None
 
-    def fit_pca(self):
-        """Fit the PCA transform"""
+    def fit(self):
+        """Fit the PCA transform setting attributes"""
         self.pca = PCA()
         self.pca.fit(self.clr_df)
         self.scores = pd.DataFrame(self.pca.transform(self.clr_df))
@@ -66,6 +109,7 @@ class CompositionalPCA:
 
     def plot_loadings(self, x_component: int = 0, y_component: int = 1) -> None:
         """Plots loadings of dataset.
+
         x/y_component : The index of the components to be plotted on x and y axes"""
         for i in range(self.loadings.shape[0]):
             x, y = (
@@ -98,8 +142,10 @@ class CompositionalPCA:
         plot_means: bool = False,
         size: float = 1,
     ) -> None:
-        """Plots a scores of a PCA dataset. Depending if categories and
-        x/y_component : The index of the components to be plotted on x and y axes
+        """Plots a scores of a PCA dataset, optionally coloured by a category or continuous
+        auxiliary variable.
+
+        x/y_component : The index of the components to be plotted on x and y axes (e.g. 0 for 1st component)
         plot_means : Indicates if means of categories to be plotted or all data points
         size : size of markers"""
 
