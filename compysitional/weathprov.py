@@ -23,40 +23,46 @@ import pandas as pd
 
 from compysitional.transforms import clr_df
 
-# Values from Lipp et al Geochem. Persp. Let. (2021) 17, 21-26 | doi: 10.7185/geochemlet.2109
 UCC_MAJORS_CLR = pd.Series(
     {
-        "SiO2": 2.33,
-        "Al2O3": 0.869,
-        "Fe2O3T": -0.142,
-        "MgO": -0.957,
-        "Na2O": -0.681,
-        "CaO": -0.587,
-        "K2O": -0.836,
+        "SiO2": 3.053662,
+        "Al2O3": 1.589025,
+        "Fe2O3T": 0.577424,
+        "MgO": -0.237084,
+        "Na2O": 0.039447,
+        "CaO": 0.132809,
+        "K2O": -0.115724,
+        "TiO2": -1.59163,
+        "MnO": -3.447928,
     }
 )  # CLR vector for Upper Continental Crust after Rudnick and Gao (2003)
 PROVENANCE_VECTOR = pd.Series(
     {
-        "SiO2": 0.234,
-        "Al2O3": 0.098,
-        "Fe2O3T": -0.231,
-        "MgO": -0.601,
-        "Na2O": 0.248,
-        "CaO": -0.336,
-        "K2O": 0.589,
+        "SiO2": -0.262876,
+        "Al2O3": -0.129283,
+        "Fe2O3T": 0.194968,
+        "MgO": 0.554626,
+        "Na2O": -0.276012,
+        "CaO": 0.296453,
+        "K2O": -0.612535,
+        "TiO2": 0.087662,
+        "MnO": 0.146997,
     }
-)  # Compositional trend for protolith changes
+)
+# Compositional trend for protolith changes (1st PC of Crater Lake suite as per Lipp et al 2020)
 WEATHERING_VECTOR = pd.Series(
     {
-        "SiO2": 0.242,
-        "Al2O3": 0.369,
-        "Fe2O3T": 0.235,
-        "MgO": 0.133,
-        "Na2O": -0.487,
-        "CaO": -0.678,
-        "K2O": 0.186,
+        "SiO2": 0.224741,
+        "Al2O3": 0.386040,
+        "Fe2O3T": 0.124464,
+        "MgO": 0.073625,
+        "Na2O": -0.546488,
+        "CaO": -0.653688,
+        "K2O": 0.163839,
+        "TiO2": 0.134725,
+        "MnO": 0.092742,
     }
-)  # Compositional trend for chemical weathering
+)  # Compositional trend for chemical weathering (1st PC of Toorongo suite as per Lipp et al 2020)
 MAJOR_OXIDES = [
     "SiO2",
     "Al2O3",
@@ -65,8 +71,11 @@ MAJOR_OXIDES = [
     "CaO",
     "Na2O",
     "K2O",
+    "TiO2",
+    "MnO",
 ]  # Strings for major element oxides
 PRISTINE_OMEGA = -0.271  # Omega value for pristine unweathered rocks
+# TODO: UPDATE THIS USING UPDATED WEATHERING VECTOR
 
 
 def coeff_to_comp(omega: float, psi: float):
