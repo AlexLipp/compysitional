@@ -1,219 +1,224 @@
 """
-weathprov
+Weathering-Provenance Module
 
-This module implements the method for analysing major elemental geochemistry described in 
-Lipp et al. (2020) ``Major Element Composition of Sediments in Termsof Weathering and Provenance: 
-Implicationsfor Crustal Recycling''.
+This module provides functionality to fit a weathering-provenance model to a compositional dataset.
+It includes functions to calculate coefficients, transform compositions, and plot the results. It
+implements the method for analysing major elemental geochemistry described in Lipp et al. (2020) 
+``Major Element Composition of Sediments in Terms of Weathering and Provenance: Implications for 
+Crustal Recycling''.
 
 Contents:
-- coeff_to_comp: Converts between omega and psi coefficients into major element compositions.
-- WeathProv: Fits a compositional dataset to weath-prov model 
+- UCC_MAJORS: Composition of Upper Continental Crust after Rudnick and Gao (2003)
+- PROVENANCE_VECTOR: Compositional trend for protolith changes
+- WEATHERING_VECTOR: Compositional trend for chemical weathering
+- PRISTINE_OMEGA: Omega value for pristine unweathered rocks
+
+Functions:
+- coeffs_to_composition(omega: float, psi: float) -> coda.Composition:
+    Calculates the major element composition based on omega and psi coefficients.
+- composition_to_coeffs(composition: coda.Composition) -> Tuple[float, float]:
+    Calculates the omega and psi coefficients based on a composition.
+
+Classes:
+- WeathProv:
+    Weathering-Provenance Model class that fits the weathering-provenance model to a CompositionalDataset.
+    Provides methods to fit data and plot the results.
 
 Citation: Lipp, A. G., Shorttle, O., Syvret, F.,& Roberts, G. G. (2020). Major element composition
 of sediments interms of weathering and provenance: implications for crustal recycling.
 Geochemistry, Geophysics, Geosystems,21, e2019GC008758. https://doi.org/10.1029/2019GC00875
 
 """
-
-from typing import Tuple
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from compysitional.transforms import clr_df
+import compysitional.composition as coda
 
-UCC_MAJORS_CLR = pd.Series(
+UCC_MAJORS = coda.Composition(
     {
-        "SiO2": 3.053662,
-        "Al2O3": 1.589025,
-        "Fe2O3T": 0.577424,
-        "MgO": -0.237084,
-        "Na2O": 0.039447,
-        "CaO": 0.132809,
-        "K2O": -0.115724,
-        "TiO2": -1.59163,
-        "MnO": -3.447928,
+        "SiO2": 0.6628855493064029,
+        "Al2O3": 0.15323387511522135,
+        "Fe2O3T": 0.055721404211408435,
+        "MgO": 0.024676622792010192,
+        "Na2O": 0.03253730736175315,
+        "CaO": 0.03572137859697889,
+        "K2O": 0.02786067927553831,
+        "TiO2": 0.006368158573209143,
+        "MnO": 0.000995024767477488,
     }
-)  # CLR vector for Upper Continental Crust after Rudnick and Gao (2003)
-PROVENANCE_VECTOR = pd.Series(
+)  # Composition of Upper Continental Crust after Rudnick and Gao (2003)
+PROVENANCE_VECTOR = coda.Composition(
     {
-        "SiO2": -0.262876,
-        "Al2O3": -0.129283,
-        "Fe2O3T": 0.194968,
-        "MgO": 0.554626,
-        "Na2O": -0.276012,
-        "CaO": 0.296453,
-        "K2O": -0.612535,
-        "TiO2": 0.087662,
-        "MnO": 0.146997,
+        "SiO2": 0.08093063126589121,
+        "Al2O3": 0.09249785282728326,
+        "Fe2O3T": 0.12792402691074226,
+        "MgO": 0.18329459679554758,
+        "Na2O": 0.07987447811537915,
+        "CaO": 0.14158802158689665,
+        "K2O": 0.057050295623748394,
+        "TiO2": 0.11490785076224003,
+        "MnO": 0.12193224611227155,
     }
 )
 # Compositional trend for protolith changes (1st PC of Crater Lake suite as per Lipp et al 2020)
-WEATHERING_VECTOR = pd.Series(
+WEATHERING_VECTOR = coda.Composition(
     {
-        "SiO2": 0.224741,
-        "Al2O3": 0.386040,
-        "Fe2O3T": 0.124464,
-        "MgO": 0.073625,
-        "Na2O": -0.546488,
-        "CaO": -0.653688,
-        "K2O": 0.163839,
-        "TiO2": 0.134725,
-        "MnO": 0.092742,
+        "SiO2": 0.13247798272176506,
+        "Al2O3": 0.1556664375277568,
+        "Fe2O3T": 0.11983783365568589,
+        "MgO": 0.11389767209128661,
+        "Na2O": 0.06126368806948359,
+        "CaO": 0.0550359870274761,
+        "K2O": 0.12465057848330773,
+        "TiO2": 0.12107382030876958,
+        "MnO": 0.11609600011446866,
     }
 )  # Compositional trend for chemical weathering (1st PC of Toorongo suite as per Lipp et al 2020)
-MAJOR_OXIDES = [
-    "SiO2",
-    "Al2O3",
-    "Fe2O3T",
-    "MgO",
-    "CaO",
-    "Na2O",
-    "K2O",
-    "TiO2",
-    "MnO",
-]  # Strings for major element oxides
-PRISTINE_OMEGA = -0.271  # Omega value for pristine unweathered rocks
+# TODO: UPDATE USING BETTER CALIBRATED WEATHERING VECTORS
+
+PRISTINE_OMEGA: float = -0.271  # Omega value for pristine unweathered rocks
 # TODO: UPDATE THIS USING UPDATED WEATHERING VECTOR
 
 
-def coeff_to_comp(omega: float, psi: float):
-    """Takes omega and psi coefficients and calculates corresponding major element
-    composition
-    """
-    p = PROVENANCE_VECTOR / np.linalg.norm(PROVENANCE_VECTOR)
-    w = WEATHERING_VECTOR / np.linalg.norm(WEATHERING_VECTOR)
-    ucc_clr = UCC_MAJORS_CLR
+def coeffs_to_composition(omega: float, psi: float) -> coda.Composition:
+    """Takes omega and psi coefficients and calculates corresponding major element composition.
 
-    clr_out = ucc_clr + p * psi + w * omega
-    comp_out = np.exp(clr_out) / np.sum(np.exp(clr_out))
-    return comp_out
+    Args:
+        omega (float): Omega coefficient.
+        psi (float): Psi coefficient.
+
+    Returns:
+        coda.Composition: Corresponding major element composition.
+    """
+
+    out = coda.add(
+        coda.add(UCC_MAJORS, coda.multiply(PROVENANCE_VECTOR, psi)),
+        coda.multiply(WEATHERING_VECTOR, omega),
+    )
+    return out
+
+
+def composition_to_coeffs(composition: coda.Composition) -> Tuple[float, float]:
+    """Takes a Composition and calculates the corresponding omega psi coefficients.
+
+    Args:
+        composition (coda.Composition): The composition.
+
+    Returns:
+        Tuple[float, float]: The omega and psi coefficients.
+    """
+    if not (UCC_MAJORS.components == composition.components):
+        raise ValueError(
+            f"Composition must contain exclusively the following components: {UCC_MAJORS.components}."
+        )
+
+    x_UCC = pd.Series(coda.subtract(composition, UCC_MAJORS).clr)
+    w, p = pd.Series(WEATHERING_VECTOR.clr), pd.Series(PROVENANCE_VECTOR.clr)
+    a_hat = w / np.linalg.norm(w)
+    b = p - (a_hat.dot(p) * a_hat)
+    b_hat = b / np.linalg.norm(b)
+
+    alpha = x_UCC.dot(a_hat)
+    beta = x_UCC.dot(b_hat)
+
+    omega = alpha - (beta / np.linalg.norm(b)) * w.dot(p)
+    psi = beta / np.linalg.norm(b)
+    return omega, psi
 
 
 class WeathProv:
-    """Decomposes major element composition of a solid geological
-    material into contributions from weathering intensity and protolith as per
-    Lipp et al. 2020, G-cubed. Can sensibly be applied to major element compositions
-    of sediments, igneous, metamorphic rocks etc.
+    """
+    Weathering-Provenance Model
+
+    This class fits the weathering-provenance model to a CompositionalDataset.
+     t provides methods to fit data to the model and plot the results.
 
     Attributes:
-        major_elements : Inputted raw compositional data
-        clr : clr transform of major_elements
-        coefficients : Fitted omega and psi coefficients
-        fitted : Modelled compositions considering only weathering and provenance
-        residuals : Residuals to model fit
-        r_squared : R-squared of model fit
-        protoliths : Calculates protoliths for modelled compositions
+        data (coda.CompositionalDataset): The compositional dataset.
+        coefficients (pd.DataFrame): Coefficients calculated for each row, including omega and psi values.
+        fitted (coda.CompositionalDataset): The fitted dataset based on the model.
+        residuals (coda.CompositionalDataset): The residuals obtained from the model fit.
+        r_squared (float): The R-squared value indicating the quality of the model fit.
+        protoliths (coda.CompositionalDataset): The protolith dataset based on the model.
 
     Methods:
-        fit(): Fits the omega-psi model to provided compositional data, setting most attributes
-        plot(): Visualises the calculated coefficients.
+        __init__(self, comp_data: coda.CompositionalDataset) -> None:
+            Initializes the WeathProv object.
 
-    Example usage:
-        >>> import pandas as pd
-        >>> # Load Toorongo soil-profile data from Nesbitt & Young (1989)
-        >>> toorongo = pd.DataFrame({
-                "SiO2": [64.26, 64.34, 64.22, 64.27, 64.33, 64.01, 63.43, 61.08, 57.98, 59.56, 60.03, 57.58, 59.3, 49.56, 53.13],
-                "Al2O3": [15.67, 15.59, 15.65, 15.68, 15.45, 15.8, 15.51, 17.71, 19.76, 18.24, 18.36, 20.03, 19.21, 28.2, 29.99],
-                "Fe2O3T": [5.590062708, 5.567835818, 5.456701371, 5.645629932, 5.490041705, 5.645629932, 5.423361037, 5.167751808, 4.956596357, 5.212205587, 4.956596357, 4.967709802, 4.745440907, 2.811701521, 2.256029284],
-                "MgO": [2.63, 2.64, 2.52, 2.63, 2.63, 2.62, 2.59, 2.31, 2.22, 2.21, 2.1, 2.07, 1.88, 1.01, 0.86],
-                "Na2O": [3.44, 3.41, 3.33, 3.26, 3.28, 3.32, 3.11, 2.09, 1.85, 1.25, 0.47, 0.43, 0.25, 0.09, 0.07],
-                "CaO": [4.31, 4.27, 3.99, 3.94, 3.7, 3.72, 3.3, 2.15, 1.33, 1.06, 0.6, 0.54, 0.34, 0.07, 0.03],
-                "K2O": [2.58, 2.63, 2.53, 2.52, 2.46, 2.63, 2.65, 2.1, 2.23, 2.4, 2.48, 2.44, 2.28, 1.53, 1.3]})
-        >>> weath_prov = WeathProv(comp_dataframe)
-        >>> weath_prov.fit()
-        >>> weath_prov.plot()
+        fit(self) -> None:
+            Fits data to the weathering-provenance model and sets the relevant attributes.
 
-    Args:
-        comp_dataframe : DataFrame of compositional data that contains major elements.
-
-    - Note that comp_dataframe must contain the following columns: "SiO2", "Al2O3", "Fe2O3T", "MgO", "CaO", "Na2O", "K2O"
+        plot(self) -> None:
+            Makes a labeled omega-psi plot for the fitted dataset.
     """
 
-    pristine: pd.Series = PRISTINE_OMEGA
-    p: pd.Series = PROVENANCE_VECTOR / np.linalg.norm(PROVENANCE_VECTOR)
-    w: pd.Series = WEATHERING_VECTOR / np.linalg.norm(WEATHERING_VECTOR)
-    ucc_clr: pd.Series = UCC_MAJORS_CLR
+    def __init__(self, comp_data: coda.CompositionalDataset) -> None:
+        """Initializes the WeathProv object.
 
-    def __init__(self, comp_dataframe: pd.DataFrame) -> None:
-        missing_columns = set(MAJOR_OXIDES) - set(comp_dataframe.columns)
-        if missing_columns:
-            missing_columns_str = ", ".join(missing_columns)
-            raise Exception(
-                f"The following columns are missing in the dataframe: {missing_columns_str}."
+        Args:
+            comp_data (coda.CompositionalDataset): The compositional dataset.
+        """
+
+        if not (UCC_MAJORS.components == comp_data.components):
+            raise ValueError(
+                f"Composition must contain exclusively the following components: {UCC_MAJORS.components}."
             )
 
-        if comp_dataframe.isna().any().any():
-            raise Exception("Warning: dataframe contains NA values")
-        if comp_dataframe.isnull().any().any():
-            raise Exception("Warning: dataframe contains Null values")
-        if (comp_dataframe == 0).any().any():
-            raise Exception("Warning: dataframe contains zero values")
-
-        self.major_elements: pd.DataFrame = comp_dataframe[MAJOR_OXIDES]
-        self.clr: pd.DataFrame = clr_df(self.major_elements)
+        self.data: coda.CompositionalDataset = comp_data
         self.coefficients: pd.DataFrame = None
-        self.fitted: pd.DataFrame = None
-        self.residuals: pd.DataFrame = None
+        self.fitted: coda.CompositionalDataset = None
+        self.residuals: coda.CompositionalDataset = None
         self.r_squared: float = None
-        self.protoliths: pd.DataFrame = None
-
-    def _clr_to_coeffs(self, x: pd.Series) -> Tuple[float, float]:
-        """Converts a clr major element vector and calculates
-        the corresponding omega psi coefficients. Variable naming
-        follows that from Lipp et al. 2020"""
-
-        x_UCC = x - self.ucc_clr
-        a_hat = self.w / np.linalg.norm(self.w)
-        b = self.p - (a_hat.dot(self.p) * a_hat)
-        b_hat = b / np.linalg.norm(b)
-
-        alpha = x_UCC.dot(a_hat)
-        beta = x_UCC.dot(b_hat)
-
-        omega = alpha - (beta / np.linalg.norm(b)) * self.w.dot(self.p)
-        psi = beta / np.linalg.norm(b)
-        return omega, psi
-
-    def _coeffs_to_clr(self, omega: float, psi: float) -> pd.Series:
-        """Converts omega psi coefficents into clr vector"""
-        return self.ucc_clr + self.p * psi + self.w * omega
+        self.protoliths: coda.CompositionalDataset = None
 
     def _calculate_r_squared(self):
-        """Calculates R-squared of model fit to data as ratio
-        of fitted sum squares to total observed sum squares"""
-        obs_rltv_mean = self.clr.sub(self.clr.mean(axis=0))
-        fit_rltv_mean = self.fitted.sub(self.clr.mean(axis=0))
+        """Calculates R-squared of model fit to data as ratio of fitted sum squares to total observed sum squares.
+
+        Returns:
+            float: The R-squared value.
+        """
+        obs_rltv_mean = self.data.clr_df.sub(self.data.geometric_mean.clr)
+        fit_rltv_mean = self.fitted.clr_df.sub(self.fitted.geometric_mean.clr)
         obs_sum_square = (obs_rltv_mean**2).sum().sum()
         fit_rltv_mean = (fit_rltv_mean**2).sum().sum()
         return fit_rltv_mean / obs_sum_square
 
-    def _get_protoliths(self) -> pd.DataFrame:
-        """Returns the modelled protoliths of dataset"""
-        return self.coefficients["psi"].apply(lambda psi: coeff_to_comp(self.pristine, psi))
-
     def fit(self) -> None:
-        """Fits data to weathering-provenance model, calculating omega
-        and psi coefficients for each row. Sets the following attributes of
-        WeathProv object: coefficients, fitted, residuals, r-squared."""
-
-        result = self.clr.apply(self._clr_to_coeffs, axis=1)
-        self.coefficients = pd.DataFrame(
-            {"omega": result.apply(lambda x: x[0]), "psi": result.apply(lambda x: x[1])}
+        """Fits data to weathering-provenance model, calculating omega and psi coefficients for each row.
+        Sets the following attributes of the WeathProv object: coefficients, fitted, residuals, r-squared.
+        """
+        result_coeffs = {
+            name: composition_to_coeffs(comp) for name, comp in self.data.compositions.items()
+        }
+        self.coefficients = pd.DataFrame(result_coeffs, index=["omega", "psi"]).T
+        self.fitted = coda.CompositionalDataset(
+            {
+                name: coeffs_to_composition(coeffs[0], coeffs[1])
+                for name, coeffs in result_coeffs.items()
+            }
         )
-        self.fitted = self.coefficients.apply(
-            lambda row: self._coeffs_to_clr(row["omega"], row["psi"]), axis=1
+        self.residuals = coda.CompositionalDataset(
+            {
+                name: coda.subtract(self.data.compositions[name], self.fitted.compositions[name])
+                for name in self.data.compositions
+            }
         )
-        self.residuals = self.clr - self.fitted
+        self.protoliths = coda.CompositionalDataset(
+            {
+                name: coeffs_to_composition(PRISTINE_OMEGA, coeffs[1])
+                for name, coeffs in result_coeffs.items()
+            }
+        )
         self.r_squared = self._calculate_r_squared()
-        self.protoliths = self._get_protoliths()
 
     def plot(self) -> None:
-        """Makes a labelled omega-psi plot for fitted dataset"""
+        """Makes a labeled omega-psi plot for the fitted dataset."""
         coeffs = self.coefficients
-        plt.vlines(x=self.pristine, ymax=3, ymin=-3, colors="grey", linestyles="dashed")
-        plt.text(x=self.pristine - 0.3, y=2.75, s="$\omega_0$", c="grey", rotation=90)
+        plt.vlines(x=PRISTINE_OMEGA, ymax=3, ymin=-3, colors="grey", linestyles="dashed")
+        plt.text(x=PRISTINE_OMEGA - 0.3, y=2.75, s="$\omega_0$", c="grey", rotation=90)
         plt.vlines(x=0, ymax=3, ymin=-3, colors="k")
         plt.text(x=0.05, y=2.6, s="UCC", c="k", rotation=90)
         plt.hlines(y=0, xmin=-1, xmax=7, colors="k")
