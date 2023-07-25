@@ -39,48 +39,40 @@ import compysitional.composition as coda
 
 UCC_MAJORS = coda.Composition(
     {
-        "SiO2": 0.6628855493064029,
-        "Al2O3": 0.15323387511522135,
-        "Fe2O3T": 0.055721404211408435,
-        "MgO": 0.024676622792010192,
-        "Na2O": 0.03253730736175315,
-        "CaO": 0.03572137859697889,
-        "K2O": 0.02786067927553831,
-        "TiO2": 0.006368158573209143,
-        "MnO": 0.000995024767477488,
+        "SiO2": 0.6669797543321818,
+        "Al2O3": 0.15474207399544637,
+        "Fe2O3T": 0.05630366845772439,
+        "MgO": 0.024922217934103645,
+        "Na2O": 0.03284369167128144,
+        "CaO": 0.036080757577384936,
+        "K2O": 0.028127836031877573,
     }
-)  # Composition of Upper Continental Crust after Rudnick and Gao (2003)
+)  # Composition of Upper Continental Crust after Rudnick and Gao (2003) and Lipp et al. 2022
 PROVENANCE_VECTOR = coda.Composition(
     {
-        "SiO2": 0.08093063126589121,
-        "Al2O3": 0.09249785282728326,
-        "Fe2O3T": 0.12792402691074226,
-        "MgO": 0.18329459679554758,
-        "Na2O": 0.07987447811537915,
-        "CaO": 0.14158802158689665,
-        "K2O": 0.057050295623748394,
-        "TiO2": 0.11490785076224003,
-        "MnO": 0.12193224611227155,
+        "SiO2": 0.1683315563485203,
+        "Al2O3": 0.14692695877416564,
+        "Fe2O3T": 0.10573495985371374,
+        "MgO": 0.07303476671952253,
+        "Na2O": 0.17070477188375244,
+        "CaO": 0.09519577725097278,
+        "K2O": 0.2400712091693525,
     }
 )
-# Compositional trend for protolith changes (1st PC of Crater Lake suite as per Lipp et al 2020)
+# Compositional trend for protolith changes (Lipp et al. 2022; GPL)
 WEATHERING_VECTOR = coda.Composition(
     {
-        "SiO2": 0.13247798272176506,
-        "Al2O3": 0.1556664375277568,
-        "Fe2O3T": 0.11983783365568589,
-        "MgO": 0.11389767209128661,
-        "Na2O": 0.06126368806948359,
-        "CaO": 0.0550359870274761,
-        "K2O": 0.12465057848330773,
-        "TiO2": 0.12107382030876958,
-        "MnO": 0.11609600011446866,
+        "SiO2": 0.17089281185916216,
+        "Al2O3": 0.19403460680142254,
+        "Fe2O3T": 0.16970073929773866,
+        "MgO": 0.1532447825259139,
+        "Na2O": 0.08243717835022095,
+        "CaO": 0.0681040395103496,
+        "K2O": 0.16158584165519227,
     }
-)  # Compositional trend for chemical weathering (1st PC of Toorongo suite as per Lipp et al 2020)
-# TODO: UPDATE USING BETTER CALIBRATED WEATHERING VECTORS
+)  # Compositional trend for chemical weathering (Lipp et al. 2022; GPL)
 
 PRISTINE_OMEGA: float = -0.271  # Omega value for pristine unweathered rocks
-# TODO: UPDATE THIS USING UPDATED WEATHERING VECTOR
 
 
 def coeffs_to_composition(omega: float, psi: float) -> coda.Composition:
@@ -191,7 +183,8 @@ class WeathProv:
         Sets the following attributes of the WeathProv object: coefficients, fitted, residuals, r-squared.
         """
         result_coeffs = {
-            name: composition_to_coeffs(comp) for name, comp in self.data.compositions.items()
+            name: composition_to_coeffs(comp)
+            for name, comp in self.data.compositions.items()
         }
         self.coefficients = pd.DataFrame(result_coeffs, index=["omega", "psi"]).T
         self.fitted = coda.CompositionalDataset(
@@ -202,7 +195,9 @@ class WeathProv:
         )
         self.residuals = coda.CompositionalDataset(
             {
-                name: coda.subtract(self.data.compositions[name], self.fitted.compositions[name])
+                name: coda.subtract(
+                    self.data.compositions[name], self.fitted.compositions[name]
+                )
                 for name in self.data.compositions
             }
         )
@@ -217,7 +212,9 @@ class WeathProv:
     def plot(self) -> None:
         """Makes a labeled omega-psi plot for the fitted dataset."""
         coeffs = self.coefficients
-        plt.vlines(x=PRISTINE_OMEGA, ymax=3, ymin=-3, colors="grey", linestyles="dashed")
+        plt.vlines(
+            x=PRISTINE_OMEGA, ymax=3, ymin=-3, colors="grey", linestyles="dashed"
+        )
         plt.text(x=PRISTINE_OMEGA - 0.3, y=2.75, s="$\omega_0$", c="grey", rotation=90)
         plt.vlines(x=0, ymax=3, ymin=-3, colors="k")
         plt.text(x=0.05, y=2.6, s="UCC", c="k", rotation=90)
