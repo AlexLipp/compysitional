@@ -1,5 +1,5 @@
 # compysitional
-Python scripts for doing basic statistical analysis on compositional data. 
+Python scripts for doing basic statistical analysis on compositional data, with a focus on geochemical data. 
 
 ## Installation 
 
